@@ -455,6 +455,36 @@ void TestSplice()
     }
 }
 
+void TestPooling()
+{
+    // Test ceil or floor output size computing
+    {
+        auto testCeilOutDimPooling = [](NDShape inputShape, NDShape kernelShape, NDShape stride, bool sameOutDim)
+        {
+            auto inputVar = InputVariable(inputShape, DataType::Float, "input");
+            auto floorPooling = Pooling(inputVar, PoolingType::Max, kernelShape, stride, { false }, { (0) }, { (0) }, false);
+            auto ceilPooling = Pooling(inputVar, PoolingType::Max, kernelShape, stride, { false }, { (0) }, { (0) }, true);
+            auto floorOutput = floorPooling->Output().Shape();
+            auto ceilOutput = ceilPooling->Output().Shape();
+            if (sameOutDim && floorOutput != ceilOutput) {
+                ReportFailure("Ceiling and Flooring expect same output size in the case between [%d * %d * %d] and [%d * %d * %d]", 
+                    (int)floorOutput[0], (int)floorOutput[1], (int)floorOutput[2], (int)ceilOutput[0], (int)ceilOutput[1], (int)ceilOutput[2]);
+            }
+            if (!sameOutDim && floorOutput == ceilOutput) {
+                ReportFailure("Ceiling and Flooring expect different output size in the case between [%d * %d * %d] and [%d * %d * %d]",
+                    (int)floorOutput[0], (int)floorOutput[1], (int)floorOutput[2], (int)ceilOutput[0], (int)ceilOutput[1], (int)ceilOutput[2]);
+            }
+        };
+
+        NDShape stride = { 2, 2, 3 };
+
+        // The case of ResNet, different output size
+        testCeilOutDimPooling(NDShape({ 112, 112, 3 }), NDShape({ 3, 3, 3 }), stride, false);
+        // The case of VGG, same output size
+        testCeilOutDimPooling(NDShape({ 112, 112, 3 }), NDShape({ 2, 2, 3 }), stride, true);
+    }
+}
+
 void TestTimesNodeShapeInference()
 {
     auto timesNodeShapeInferenceTest = [](size_t inputRank, size_t outputRank, int inputRankToMap) {
@@ -1018,6 +1048,11 @@ BOOST_AUTO_TEST_CASE(TransposeInGPU)
 {
     if (IsGPUAvailable())
         TestTranspose(3, 1, 2, DeviceDescriptor::GPUDevice(0));
+}
+
+BOOST_AUTO_TEST_CASE(Pooling)
+{
+    TestPooling();
 }
 
 BOOST_AUTO_TEST_CASE(OutputVariableNameInCPU)
